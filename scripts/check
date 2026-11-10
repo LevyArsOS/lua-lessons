@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Run all Lua lesson unit tests. Benchmarks are not run here.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+shopt -s nullglob
+tests=(tests/**/*_test.lua tests/*_test.lua)
+if (( ${#tests[@]} == 0 )); then
+  echo "All Lua checks passed (0 test suites)."
+  exit 0
+fi
+
+lua_bin=""
+for candidate in lua5.4 lua luajit; do
+  if command -v "$candidate" >/dev/null 2>&1; then
+    lua_bin="$candidate"
+    break
+  fi
+done
+[[ -n "$lua_bin" ]] || { echo "lua interpreter (lua5.4, lua, or luajit) not found on PATH" >&2; exit 1; }
+
+export LUA_PATH="$PWD/?.lua;$PWD/?/init.lua;;"
+for t in "${tests[@]}"; do
+  "$lua_bin" "$t"
+done
+echo "All Lua checks passed (${#tests[@]} test suites)."
