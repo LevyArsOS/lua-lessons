@@ -10,3 +10,6 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | Benchmark | A Lua script measuring the lesson's scenarios (`os.clock()` and `collectgarbage("count")`); run on demand, never in `scripts/check` | A unit test |
 | Array part | Contiguous integer-indexed part (`1..n`) of a Lua table | The hash part of a Lua table |
 | Upvalue | Local variable captured from an enclosing lexical scope | A global variable in `_G` |
+| Table churn | Rapid allocation and discarding of short-lived Lua tables triggering frequent GC sweeps | Long-lived table growth |
+| Scratch table | A reusable pre-allocated table for transient calculations that is never retained across calls | A permanent data model table |
+

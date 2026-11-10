@@ -30,7 +30,8 @@ benchmarks and explanations in both English and Brazilian Portuguese.
 
 | Lesson | Tutorial | Benchmark |
 |---|---|---|
-| *(coming soon)* | - | - |
+| Table Reuse | [English](lessons/TableReuse/Tutorial/en.md) · [Português](lessons/TableReuse/Tutorial/pt-br.md) | [Results](lessons/TableReuse/Benchmark.md) |
+
 
 ## Getting started
 
