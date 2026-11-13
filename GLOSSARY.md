@@ -12,4 +12,5 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | Upvalue | Local variable captured from an enclosing lexical scope | A global variable in `_G` |
 | Table churn | Rapid allocation and discarding of short-lived Lua tables triggering frequent GC sweeps | Long-lived table growth |
 | Scratch table | A reusable pre-allocated table for transient calculations that is never retained across calls | A permanent data model table |
+| Object pool | A pre-allocated collection of reusable instances acquired and returned with deterministic state reset | Dynamic per-frame table creation |
 
