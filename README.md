@@ -31,6 +31,7 @@ benchmarks and explanations in both English and Brazilian Portuguese.
 | Lesson | Tutorial | Benchmark |
 |---|---|---|
 | Table Reuse | [English](lessons/TableReuse/Tutorial/en.md) · [Português](lessons/TableReuse/Tutorial/pt-br.md) | [Results](lessons/TableReuse/Benchmark.md) |
+| Object Pooling | [English](lessons/ObjectPooling/Tutorial/en.md) · [Português](lessons/ObjectPooling/Tutorial/pt-br.md) | [Results](lessons/ObjectPooling/Benchmark.md) |
 
 
 ## Getting started
