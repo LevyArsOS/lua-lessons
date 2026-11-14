@@ -34,6 +34,7 @@ benchmarks and explanations in both English and Brazilian Portuguese.
 | Object Pooling | [English](lessons/ObjectPooling/Tutorial/en.md) · [Português](lessons/ObjectPooling/Tutorial/pt-br.md) | [Results](lessons/ObjectPooling/Benchmark.md) |
 | Locals vs Globals | [English](lessons/LocalsVsGlobals/Tutorial/en.md) · [Português](lessons/LocalsVsGlobals/Tutorial/pt-br.md) | [Results](lessons/LocalsVsGlobals/Benchmark.md) |
 | Array vs Hash | [English](lessons/ArrayVsHash/Tutorial/en.md) · [Português](lessons/ArrayVsHash/Tutorial/pt-br.md) | [Results](lessons/ArrayVsHash/Benchmark.md) |
+| String Concatenation | [English](lessons/StringConcat/Tutorial/en.md) · [Português](lessons/StringConcat/Tutorial/pt-br.md) | [Results](lessons/StringConcat/Benchmark.md) |
 
 
 ## Getting started
