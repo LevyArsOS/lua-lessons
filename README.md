@@ -33,6 +33,7 @@ benchmarks and explanations in both English and Brazilian Portuguese.
 | Table Reuse | [English](lessons/TableReuse/Tutorial/en.md) · [Português](lessons/TableReuse/Tutorial/pt-br.md) | [Results](lessons/TableReuse/Benchmark.md) |
 | Object Pooling | [English](lessons/ObjectPooling/Tutorial/en.md) · [Português](lessons/ObjectPooling/Tutorial/pt-br.md) | [Results](lessons/ObjectPooling/Benchmark.md) |
 | Locals vs Globals | [English](lessons/LocalsVsGlobals/Tutorial/en.md) · [Português](lessons/LocalsVsGlobals/Tutorial/pt-br.md) | [Results](lessons/LocalsVsGlobals/Benchmark.md) |
+| Array vs Hash | [English](lessons/ArrayVsHash/Tutorial/en.md) · [Português](lessons/ArrayVsHash/Tutorial/pt-br.md) | [Results](lessons/ArrayVsHash/Benchmark.md) |
 
 
 ## Getting started
