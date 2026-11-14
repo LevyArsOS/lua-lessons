@@ -15,4 +15,5 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | Object pool | A pre-allocated collection of reusable instances acquired and returned with deterministic state reset | Dynamic per-frame table creation |
 | Environment lookup | Resolving a global name via hash-table lookup in `_ENV` (`GETTABUP`) at runtime | Local variable / upvalue register access |
 | SoA (Structure of Arrays) | Parallel `1..n` flat arrays (`xs`, `ys`, `vxs`, `vys`) avoiding per-entity subtables | Array of entity tables (`AoS`) |
+| String interning | Deduplicating and hashing immutable strings in Lua's global string table upon creation | Mutable string builder buffer (`table.concat`) |
 
