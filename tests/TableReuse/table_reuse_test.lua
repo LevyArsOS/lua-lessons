@@ -59,17 +59,23 @@ local function test_integrate_equivalence_and_inplace()
 end
 
 local function test_zero_allocation_loop()
-    collectgarbage("collect")
-    local mem_before = collectgarbage("count")
-
     local pos = { x = 0, y = 0 }
     local vel = { x = 1, y = 1 }
     local dest = { x = 0, y = 0 }
 
-    for _ = 1, 10000 do
-        optimized.integrate_inplace(pos, vel, 0.016)
-        optimized.scale(vel, 1.0001, dest)
+    local function run_loop(iterations)
+        for _ = 1, iterations do
+            optimized.integrate_inplace(pos, vel, 0.016)
+            optimized.scale(vel, 1.0001, dest)
+        end
     end
+
+    -- Warm up the loop trace so LuaJIT does not compile a new trace during measurement.
+    run_loop(200)
+
+    collectgarbage("collect")
+    local mem_before = collectgarbage("count")
+    run_loop(10000)
 
     local mem_after = collectgarbage("count")
     local delta = mem_after - mem_before
