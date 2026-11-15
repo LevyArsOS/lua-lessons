@@ -17,4 +17,7 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | SoA (Structure of Arrays) | Parallel `1..n` flat arrays (`xs`, `ys`, `vxs`, `vys`) avoiding per-entity subtables | Array of entity tables (`AoS`) |
 | String interning | Deduplicating and hashing immutable strings in Lua's global string table upon creation | Mutable string builder buffer (`table.concat`) |
 | Metatable chain (`__index`) | Delegating missing table key lookups through one or more prototype tables via `__index` metamethods | Direct field access on a flat table |
+| AoS (Array of Structs) | Dense `1..n` array of per-entity tables (`entities[i].x`) | Structure of Arrays (`SoA`) |
+| Hash part | Chained scatter-table region (`Node`) of a Lua table for string or sparse keys | The contiguous array part (`1..n`) |
+| VM register | Fixed stack slot (`0..249`) holding a `local` variable in a Lua function frame | Environment lookup in `_ENV` |
 
