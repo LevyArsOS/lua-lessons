@@ -45,8 +45,8 @@ local sim_pool = optimized.new_pool(batch_size, optimized.create_projectile, opt
 local scratch = {}
 
 local naive_sum = naive.simulate(cycles, batch_size, lifetime, dt)
--- Warmup (also warms Lua CallInfo stack)
-optimized.simulate(batch_size, batch_size, lifetime, dt, sim_pool, scratch)
+-- Warmup with full cycle count so LuaJIT compiles hot/side traces and Lua warms CallInfo stack.
+optimized.simulate(cycles, batch_size, lifetime, dt, sim_pool, scratch)
 
 collectgarbage("collect")
 collectgarbage("stop")
