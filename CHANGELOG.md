@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. Format: [Keep a Changelog](https://keepachangelog.com), versioning: [SemVer](https://semver.org).
 
+## [0.2.0](https://github.com/LevyArsOS/lua-lessons/compare/v0.1.0...v0.2.0) - 2026-11-15
+
+### Added
+- **lessons:** use shared bench harness in ObjectPooling, StringConcat, and TableReuse [#30] (54ee092)
+- **metatable-overhead:** add metatable hierarchy and flat entity simulation with tests [#6] (901757c)
+
+### Fixed
+- **tests:** warm up LuaJIT traces in ObjectPooling and TableReuse tests [#37] (595afba)
+
+### Documentation
+- **readme:** organize topics into progressive learning paths [#29] (451909d)
+- **array-vs-hash:** document multi-sample timing and GC memory delta [#30] (86e24bb)
+- **metatable-overhead:** add benchmark, bilingual tutorials, and glossary [#6] (d0aada7)
+
 ## [0.1.0] - 2026-11-14
 
 ### Added

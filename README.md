@@ -28,13 +28,32 @@ benchmarks and explanations in both English and Brazilian Portuguese.
 
 ## Topics
 
+Start with **Memory & Garbage Collection** to eliminate frame-time allocations, then move through **Data Layout & Cache Locality** and **VM Dispatch & Lookup** to speed up inner loops.
+
+### Memory & Garbage Collection
+
 | Lesson | Tutorial | Benchmark |
 |---|---|---|
 | Table Reuse | [English](lessons/TableReuse/Tutorial/en.md) · [Português](lessons/TableReuse/Tutorial/pt-br.md) | [Results](lessons/TableReuse/Benchmark.md) |
 | Object Pooling | [English](lessons/ObjectPooling/Tutorial/en.md) · [Português](lessons/ObjectPooling/Tutorial/pt-br.md) | [Results](lessons/ObjectPooling/Benchmark.md) |
-| Locals vs Globals | [English](lessons/LocalsVsGlobals/Tutorial/en.md) · [Português](lessons/LocalsVsGlobals/Tutorial/pt-br.md) | [Results](lessons/LocalsVsGlobals/Benchmark.md) |
-| Array vs Hash | [English](lessons/ArrayVsHash/Tutorial/en.md) · [Português](lessons/ArrayVsHash/Tutorial/pt-br.md) | [Results](lessons/ArrayVsHash/Benchmark.md) |
 | String Concatenation | [English](lessons/StringConcat/Tutorial/en.md) · [Português](lessons/StringConcat/Tutorial/pt-br.md) | [Results](lessons/StringConcat/Benchmark.md) |
+
+### Data Layout & Cache Locality
+
+| Lesson | Tutorial | Benchmark |
+|---|---|---|
+| Array vs Hash (`AoS` & `SoA`) | [English](lessons/ArrayVsHash/Tutorial/en.md) · [Português](lessons/ArrayVsHash/Tutorial/pt-br.md) | [Results](lessons/ArrayVsHash/Benchmark.md) |
+
+### VM Dispatch & Lookup
+
+| Lesson | Tutorial | Benchmark |
+|---|---|---|
+| Locals vs Globals | [English](lessons/LocalsVsGlobals/Tutorial/en.md) · [Português](lessons/LocalsVsGlobals/Tutorial/pt-br.md) | [Results](lessons/LocalsVsGlobals/Benchmark.md) |
+| Metatable Overhead | [English](lessons/MetatableOverhead/Tutorial/en.md) · [Português](lessons/MetatableOverhead/Tutorial/pt-br.md) | [Results](lessons/MetatableOverhead/Benchmark.md) |
+
+### Architecture & Serialization
+
+Upcoming lessons on data-oriented system boundaries, binary serialization, and coroutine scheduling will be added here.
 
 
 ## Getting started
