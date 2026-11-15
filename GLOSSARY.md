@@ -16,4 +16,5 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | Environment lookup | Resolving a global name via hash-table lookup in `_ENV` (`GETTABUP`) at runtime | Local variable / upvalue register access |
 | SoA (Structure of Arrays) | Parallel `1..n` flat arrays (`xs`, `ys`, `vxs`, `vys`) avoiding per-entity subtables | Array of entity tables (`AoS`) |
 | String interning | Deduplicating and hashing immutable strings in Lua's global string table upon creation | Mutable string builder buffer (`table.concat`) |
+| Metatable chain (`__index`) | Delegating missing table key lookups through one or more prototype tables via `__index` metamethods | Direct field access on a flat table |
 
