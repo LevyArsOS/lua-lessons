@@ -20,4 +20,5 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | AoS (Array of Structs) | Dense `1..n` array of per-entity tables (`entities[i].x`) | Structure of Arrays (`SoA`) |
 | Hash part | Chained scatter-table region (`Node`) of a Lua table for string or sparse keys | The contiguous array part (`1..n`) |
 | VM register | Fixed stack slot (`0..249`) holding a `local` variable in a Lua function frame | Environment lookup in `_ENV` |
+| Closure allocation (`CLOSURE`) | Heap-allocating a new `LClosure` header and `UpVal` cells each time `function(...) ... end` executes | Calling a pre-allocated stateless `local function` with explicit context arguments |
 
