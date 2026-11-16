@@ -24,9 +24,9 @@ In Lua, `local` variables sit in your tool belt (VM registers), while global nam
 
 ## How Lua Resolves Globals vs. Locals
 
-Lua has no special "global variable" storage. Every free name is syntactic sugar for indexing the `_ENV` upvalue table (`_ENV["math"]`). Evaluating `math.sin(angle)` inside a loop performs **two** hash-table lookups on every iteration:
+Lua has no special "global variable" storage. Every module receives a hidden table called `_ENV` (its global namespace), and every free name is syntactic sugar for indexing it (`_ENV["math"]`). Evaluating `math.sin(angle)` inside a loop performs **two** hash-table lookups on every iteration:
 
-1. `GETTABUP`: Hash-lookup `"math"` inside `_ENV`.
+1. `GETTABUP`: The VM instruction that looks up `"math"` by hashing inside the `_ENV` upvalue table.
 2. `GETFIELD` / `GETTABLE`: Hash-lookup `"sin"` inside the `math` table.
 
 By contrast, `local` variables live directly in the function's fixed-size **VM register array** (indexed by integer slot, no hashing).
@@ -46,17 +46,23 @@ Global Access: math.sin(angle)         Local Access: sin(angle)
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Naive: Global _ENV Lookups"]
-        L1["Loop Iteration"] --> G1["GETTABUP _ENV['math']"]
-        G1 --> G2["Hash Lookup math['sin']"]
-        G2 --> G3["GETTABUP _ENV['_G']['GLOBAL_SCALE']"]
-        G3 --> C1["Compute sin(angle) * scale"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Naive: Global _ENV Hash Lookups (10M hashes)"]
+        L1["Loop Iteration"]:::vm --> G1["GETTABUP: hash 'math' in _ENV<br/>(global namespace table)"]:::warn
+        G1 --> G2["Hash lookup 'sin' in math<br/>(repeated every iteration)"]:::slow
+        G2 --> G3["GETTABUP: hash '_G' -> 'GLOBAL_SCALE'<br/>(2 more hash probes)"]:::slow
+        G3 --> C1["Compute sin(angle) * scale"]:::slow
     end
 
-    subgraph Optimized["Optimized: Cached Locals"]
-        Init["Module Load: local sin = math.sin"] --> Up["Upvalue Slot"]
-        L2["Loop Entry: local scale = LOCAL_SCALE"] --> Reg["VM Stack Register"]
-        Reg --> C2["Direct Register Read + Call"]
+    subgraph Optimized["Optimized: Cached Locals & Registers (0 hashes)"]
+        Init["Module Load: local sin = math.sin<br/>(resolved once at startup)"]:::fast --> Up["Upvalue Slot<br/>(direct pointer, no hashing)"]:::vm
+        L2["Loop Entry: local scale = LOCAL_SCALE"]:::vm --> Reg["VM Stack Register R[idx]<br/>(1 CPU memory load)"]:::fast
+        Up --> C2["Direct Register Read + Call<br/>(1.54x faster)"]:::fast
+        Reg --> C2
     end
 ```
 

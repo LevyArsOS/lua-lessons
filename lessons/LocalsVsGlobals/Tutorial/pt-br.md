@@ -24,9 +24,9 @@ Em Lua, variáveis `local` ficam no seu cinto de ferramentas (registradores da V
 
 ## Como Lua Resolve Globais vs. Locais
 
-Lua não possui armazenamento separado para "variáveis globais". Todo nome livre é açúcar sintático para indexar a tabela upvalue `_ENV` (`_ENV["math"]`). Avaliar `math.sin(angle)` dentro de um loop executa **duas** buscas hash a cada iteração:
+Lua não possui armazenamento separado para "variáveis globais". Todo módulo recebe uma tabela oculta chamada `_ENV` (seu namespace global), e todo nome livre é açúcar sintático para indexá-la (`_ENV["math"]`). Avaliar `math.sin(angle)` dentro de um loop executa **duas** buscas hash a cada iteração:
 
-1. `GETTABUP`: Busca hash por `"math"` dentro de `_ENV`.
+1. `GETTABUP`: A instrução da VM que busca `"math"` por hash dentro da tabela upvalue `_ENV`.
 2. `GETFIELD` / `GETTABLE`: Busca hash por `"sin"` dentro da tabela `math`.
 
 Já variáveis `local` vivem diretamente no **array de registradores da VM** da função (indexado por posição inteira, sem hash).
@@ -46,17 +46,23 @@ Acesso Global: math.sin(angle)         Acesso Local: sin(angle)
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Ingênua: Buscas Globais em _ENV"]
-        L1["Iteração do Loop"] --> G1["GETTABUP _ENV['math']"]
-        G1 --> G2["Busca Hash math['sin']"]
-        G2 --> G3["GETTABUP _ENV['_G']['GLOBAL_SCALE']"]
-        G3 --> C1["Calcular sin(angle) * scale"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Ingênua: Buscas Globais em _ENV (10M hashes)"]
+        L1["Iteração do Loop"]:::vm --> G1["GETTABUP: hash 'math' em _ENV<br/>(tabela do namespace global)"]:::warn
+        G1 --> G2["Busca hash 'sin' em math<br/>(repetida a cada iteração)"]:::slow
+        G2 --> G3["GETTABUP: hash '_G' -> 'GLOBAL_SCALE'<br/>(mais 2 sondas hash)"]:::slow
+        G3 --> C1["Calcular sin(angle) * scale"]:::slow
     end
 
-    subgraph Optimized["Otimizada: Locais em Cache"]
-        Init["Carga do Módulo: local sin = math.sin"] --> Up["Slot de Upvalue"]
-        L2["Entrada do Loop: local scale = LOCAL_SCALE"] --> Reg["Registrador da Pilha VM"]
-        Reg --> C2["Leitura Direta + Chamada"]
+    subgraph Optimized["Otimizada: Locais e Registradores (0 hashes)"]
+        Init["Carga do Módulo: local sin = math.sin<br/>(resolvido uma vez no início)"]:::fast --> Up["Slot de Upvalue<br/>(ponteiro direto, sem hash)"]:::vm
+        L2["Entrada do Loop: local scale = LOCAL_SCALE"]:::vm --> Reg["Registrador da Pilha VM R[idx]<br/>(1 leitura na CPU)"]:::fast
+        Up --> C2["Leitura Direta + Chamada<br/>(1.54x mais rápido)"]:::fast
+        Reg --> C2
     end
 ```
 
