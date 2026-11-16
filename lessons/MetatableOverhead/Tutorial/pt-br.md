@@ -49,17 +49,22 @@ Cadeia __index de 4 Níveis                  Tabela Plana + Locais
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Ingênua: Hierarquia __index de 4 Níveis"]
-        E1["entities[i]:step(dt)"] --> H1["Percorrer Instância -> CombatUnit"]
-        H1 --> H2["step() -> apply_damping() -> Entity"]
-        H2 --> H3["get_drag() / get_gravity() -> BaseObject"]
-        H3 --> H4["integrate() -> MobileActor -> accel_scale"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Ingênua: Cadeia __index de 4 Níveis"]
+        E1["entities[i]:step(dt)<br/>(opcode SELF + CALL)"]:::warn --> H1["Falta na instância -> checa CombatUnit<br/>(busca __index #1 na metatable)"]:::slow
+        H1 --> H2["step() chama apply_damping()<br/>(falha -> Entity -> BaseObject)"]:::slow
+        H2 --> H3["get_drag() / get_gravity()<br/>(4 saltos __index + 5 chamadas)"]:::slow
+        H3 --> H4["integrate() lê self.accel_scale<br/>(mais 3 falhas -> BaseObject)"]:::slow
     end
 
     subgraph Optimized["Otimizada: Dados Planos + Loop em Lote"]
-        O1["Subir DRAG, GRAVITY, ACCEL_SCALE para Locais"] --> O2["for i = 1, n do"]
-        O2 --> O3["Ler e.vx, e.vy, e.x, e.y Diretamente"]
-        O3 --> O4["Atualizar In-Place (0 Saltos de Metatable)"]
+        O1["Subir DRAG, GRAVITY, ACCEL_SCALE<br/>para registradores locais uma vez"]:::vm --> O2["for i = 1, n do"]:::vm
+        O2 --> O3["Ler e.vx, e.vy, e.x, e.y direto<br/>(0 saltos __index, 0 chamadas)"]:::fast
+        O3 --> O4["Atualizar in-place<br/>(6.71x mais rápido)"]:::fast
     end
 ```
 
@@ -67,7 +72,7 @@ flowchart TD
 
 ## Despacho de Métodos (`SELF`) vs. Loops em Lote
 
-Escrever `self:apply_damping(dt)` gera um opcode `SELF` seguido de `CALL`. Em `naive.lua`, uma única chamada `entity:step(dt)` dispara **5 chamadas de método** (`step`, `apply_damping`, `get_drag`, `get_gravity`, `integrate`) mais **3 leituras de campo protótipo** (`drag`, `gravity`, `accel_scale`), cada uma percorrendo até 4 saltos de metatable.
+Escrever `self:apply_damping(dt)` gera um opcode `SELF` (que busca o método em `self` e passa `self` automaticamente como primeiro argumento) seguido de `CALL`. Em `naive.lua`, uma única chamada `entity:step(dt)` dispara **5 chamadas de método** (`step`, `apply_damping`, `get_drag`, `get_gravity`, `integrate`) mais **3 leituras de campo protótipo** (`drag`, `gravity`, `accel_scale`), cada uma percorrendo até 4 saltos de metatable.
 
 Mover constantes para variáveis `local` do módulo e processar tabelas planas `{ x, y, vx, vy }` em um único `for i = 1, n` elimina todos os saltos `__index` e todos os frames de chamada por entidade.
 

@@ -49,17 +49,22 @@ Naive 4-Level __index Chain                 Optimized Flat Table + Locals
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Naive: 4-Level __index Hierarchy"]
-        E1["entities[i]:step(dt)"] --> H1["Walk Instance -> CombatUnit"]
-        H1 --> H2["step() -> apply_damping() -> Entity"]
-        H2 --> H3["get_drag() / get_gravity() -> BaseObject"]
-        H3 --> H4["integrate() -> MobileActor -> accel_scale"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Naive: 4-Level __index Fallback Chain"]
+        E1["entities[i]:step(dt)<br/>(SELF opcode + CALL)"]:::warn --> H1["Miss on instance -> check CombatUnit<br/>(metatable __index lookup #1)"]:::slow
+        H1 --> H2["step() calls apply_damping()<br/>(misses -> Entity -> BaseObject)"]:::slow
+        H2 --> H3["get_drag() / get_gravity()<br/>(4 __index hops + 5 call frames)"]:::slow
+        H3 --> H4["integrate() reads self.accel_scale<br/>(3 more misses -> BaseObject)"]:::slow
     end
 
     subgraph Optimized["Optimized: Flat Data + Batch Loop"]
-        O1["Hoist DRAG, GRAVITY, ACCEL_SCALE to Locals"] --> O2["for i = 1, n do"]
-        O2 --> O3["Read e.vx, e.vy, e.x, e.y Directly"]
-        O3 --> O4["Update In-Place (0 Metatable Hops)"]
+        O1["Hoist DRAG, GRAVITY, ACCEL_SCALE<br/>to local VM registers once"]:::vm --> O2["for i = 1, n do"]:::vm
+        O2 --> O3["Read e.vx, e.vy, e.x, e.y directly<br/>(0 __index hops, 0 method calls)"]:::fast
+        O3 --> O4["Update in-place<br/>(6.71x faster)"]:::fast
     end
 ```
 
@@ -67,7 +72,7 @@ flowchart TD
 
 ## Method Dispatch (`SELF`) vs. Flat Batch Loops
 
-Writing `self:apply_damping(dt)` emits a `SELF` opcode followed by `CALL`. Inside `naive.lua`, a single `entity:step(dt)` triggers **5 method calls** (`step`, `apply_damping`, `get_drag`, `get_gravity`, `integrate`) plus **3 prototype field reads** (`drag`, `gravity`, `accel_scale`), each walking up to 4 metatable hops.
+Writing `self:apply_damping(dt)` emits a `SELF` opcode (which looks up the method on `self` and automatically passes `self` as the first argument) followed by `CALL`. Inside `naive.lua`, a single `entity:step(dt)` triggers **5 method calls** (`step`, `apply_damping`, `get_drag`, `get_gravity`, `integrate`) plus **3 prototype field reads** (`drag`, `gravity`, `accel_scale`), each walking up to 4 metatable hops.
 
 Moving constants into module `local` registers and processing flat `{ x, y, vx, vy }` tables in a single `for i = 1, n` loop removes every `__index` hop and every function call frame per entity.
 
