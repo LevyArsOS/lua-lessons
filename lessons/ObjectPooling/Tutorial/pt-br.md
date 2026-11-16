@@ -26,9 +26,9 @@ Em loops de jogos em Lua, entidades de vida curta como projéteis, partículas e
 
 Em Lua 5.4 e LuaJIT, cada construtor `{ ... }` aloca uma struct C `Table` na heap. Para um projétil com 6 campos nomeados (`x`, `y`, `vx`, `vy`, `ttl`, `active`), o runtime aloca:
 
-1. **Cabeçalho da Tabela**: ~40 a 56 bytes para metadados do GC, ponteiro de array, ponteiro de hash e metatabela.
-2. **Array de Nós Hash**: Espaço para 8 slots `Node` (próxima potência de dois acima de 6 chaves), somando ~248 bytes por projétil no nosso benchmark.
-3. **Barreiras de Escrita e Coleta**: Toda nova tabela entra na lista do coletor incremental mark-and-sweep.
+1. **Cabeçalho da Tabela**: ~40 a 56 bytes para metadados do coletor de lixo (GC), ponteiro de array, ponteiro de hash e metatabela.
+2. **Array de Nós Hash**: Espaço para 8 buckets `Node` (próxima potência de dois acima de 6 chaves), somando ~248 bytes por projétil no nosso benchmark.
+3. **Barreiras de Escrita e Coleta**: Toda nova tabela entra na lista do coletor incremental mark-and-sweep — que periodicamente percorre objetos vivos e varre os mortos, causando engasgos de frame quando milhares de tabelas curtas se acumulam.
 
 ```text
 Heap (Ingênua: 10.000 disparos)     Heap (Pool: capacidade 200)
@@ -43,19 +43,24 @@ Heap (Ingênua: 10.000 disparos)     Heap (Pool: capacidade 200)
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Ingênua: Alocação por Disparo"]
-        S1["Disparar Projétil"] --> A1["Alocar Table + 8 Nós Hash"]
-        A1 --> U1["Atualizar por N Frames"]
-        U1 --> D1["Descartar Referência"]
-        D1 --> GC1["GC Marca e Coleta (~2.43 MB)"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Ingênua: Alocação por Disparo (2,43 MB na heap)"]
+        S1["Disparar Projétil"]:::vm --> A1["Alocar Table + 8 Nós Hash<br/>(~248 bytes por disparo)"]:::slow
+        A1 --> U1["Atualizar por N Frames"]:::vm
+        U1 --> D1["Descartar Referência"]:::warn
+        D1 --> GC1["GC Marca e Coleta<br/>(engasgos no frame rate)"]:::slow
     end
 
-    subgraph Pooled["Otimizada: Object Pool"]
-        Init["Carga da Cena: Pool.new_pool(200)"] --> Stack["Pilha _free[1..200]"]
-        S2["Disparar: pool:get()"] --> Pop["Retira _free[_top], _top - 1"]
-        Pop --> U2["activate_projectile() + Update"]
-        U2 --> Rel["Expirar: pool:release(p)"]
-        Rel --> Reset["reset_projectile(p) + Empilha"]
+    subgraph Pooled["Otimizada: Object Pool (~0 KB de delta)"]
+        Init["Carga da Cena: Pool.new_pool(200)<br/>(pré-aquece 200 tabelas 1x)"]:::fast --> Stack["Pilha _free[1..200]"]:::vm
+        S2["Disparar: pool:get()"]:::vm --> Pop["Retira _free[_top], _top - 1<br/>(O(1), 0 alocações)"]:::fast
+        Pop --> U2["activate_projectile() + Update"]:::vm
+        U2 --> Rel["Expirar: pool:release(p)"]:::vm
+        Rel --> Reset["reset_projectile(p) + Empilha<br/>(pronto para reuso)"]:::fast
     end
 ```
 

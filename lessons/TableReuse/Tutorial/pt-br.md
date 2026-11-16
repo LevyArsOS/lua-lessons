@@ -9,7 +9,8 @@
   - [Padrão 1: Mutação no Local (In-Place)](#padrão-1-mutação-no-local-in-place)
   - [Padrão 2: Buffer de Rascunho (Scratch Table)](#padrão-2-buffer-de-rascunho-scratch-table)
   - [Padrão 3: Parâmetro de Destino (Out)](#padrão-3-parâmetro-de-destino-out)
-- [Armadilhas e Cuidados](#armadilhas-e-cuidados)
+- [Armadilhas, Trade-offs e Quando NÃO Usar](#armadilhas-trade-offs-e-quando-não-usar)
+- [Dicas de Profiling](#dicas-de-profiling)
 - [Resumo](#resumo)
 
 ---
@@ -26,22 +27,27 @@ Cada tabela criada em Lua é uma estrutura C alocada na heap (`Table` na impleme
 
 1. **Cabeçalho de Memória**: Contém ponteiros para parte de array, hash part, metatabela e flags do GC (~40 a 56 bytes mínimos).
 2. **Nós da Hash**: Chaves como `x` e `y` alocam entradas na tabela hash (`Node`), além do cálculo de hash de strings.
-3. **Rastreamento do GC**: Cada nova tabela precisa ser registrada nas listas de controle do coletor de lixo.
+3. **Rastreamento do GC**: Cada nova tabela é adicionada às listas internas do coletor de lixo (listas de objetos cinza/preto usadas para marcar objetos vivos e varrer os mortos).
 
 ```mermaid
 flowchart TD
-    subgraph NaivePattern["Criação a Cada Frame (Sobrecarga de Heap)"]
-        F["Loop de Frame"] --> T1["criar {x, y}"]
-        F --> T2["criar {x, y}"]
-        T1 --> GC["Pressão no Garbage Collector"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph NaivePattern["Ingênua: Criação por Frame (~10 MB na heap)"]
+        F["Loop de Frame"]:::vm --> T1["return { x = ..., y = ... }<br/>(aloca Table + Nós hash)"]:::warn
+        F --> T2["Outro { x = ..., y = ... }<br/>(milhares por frame)"]:::warn
+        T1 --> GC["Pressão no Garbage Collector<br/>(marca e varre tabelas mortas)"]:::slow
         T2 --> GC
-        GC --> Pause["Pausa de Coleta (Queda de FPS)"]
+        GC --> Pause["Pausa de 2–10 ms no GC<br/>(queda abaixo de 60 FPS)"]:::slow
     end
 
-    subgraph OptimizedPattern["Reutilização de Tabela (Zero Alocação)"]
-        F2["Loop de Frame"] --> S["Reaproveitar Tabela Pré-alocada"]
-        S --> Mut["Mutar Campos In-Place"]
-        Mut --> Steady["Delta de 0 KB no GC"]
+    subgraph OptimizedPattern["Otimizada: Reutilização de Tabela (0 KB no GC)"]
+        F2["Loop de Frame"]:::vm --> S["Reaproveitar Tabela Pré-alocada<br/>(scratch ou parâmetro out)"]:::fast
+        S --> Mut["Mutar Campos In-Place<br/>(out.x = ..., out.y = ...)"]:::vm
+        Mut --> Steady["Delta de 0 KB no GC<br/>(5.7x mais rápido, FPS estável)"]:::fast
     end
 ```
 
@@ -49,7 +55,7 @@ flowchart TD
 
 ## Coleta de Lixo em Lua e Engasgos de Frame
 
-Lua utiliza um coletor incremental do tipo mark-and-sweep. Quando o consumo de memória sobe abruptamente, o GC acelera seus ciclos. Se o volume de alocação superar o ritmo do coletor, ocorrem pausas perceptíveis de 2 a 10 milissegundos, estourando o limite de 16.6 ms por quadro.
+Lua utiliza um coletor incremental do tipo **mark-and-sweep**: periodicamente ele marca objetos alcançáveis como vivos e varre os inacessíveis da memória. Quando o consumo sobe abruptamente, o GC acelera seus ciclos. Se o volume de alocação superar o ritmo do coletor, ocorrem pausas perceptíveis de 2 a 10 milissegundos, estourando o limite de 16.6 ms por quadro.
 
 ---
 
@@ -90,10 +96,18 @@ end
 
 ---
 
-## Armadilhas e Cuidados
+## Armadilhas, Trade-offs e Quando NÃO Usar
 
 - **Erros de Aliasing**: Armazenar referências de tabelas scratch entre frames corrompe dados quando outra função reutiliza a mesma tabela.
-- **Regra de Ouro**: Tabelas scratch devem ser consumidas imediatamente na pilha atual. Para estados persistentes de entidades, passe tabelas dedicadas.
+- **Regra de Ouro**: Tabelas scratch devem ser consumidas imediatamente na pilha atual. Para estados persistentes de entidades, passe tabelas `out` dedicadas.
+- **Quando NÃO Usar**: Não reutilize tabelas scratch através de `coroutine.yield`, callbacks assíncronos ou APIs públicas onde o chamador espera ser dono da tabela retornada. Em código frio de inicialização ou UI, retornar `{ x = ..., y = ... }` é mais claro e não afeta o frame rate.
+
+---
+
+## Dicas de Profiling
+
+1. **Meça o Delta de Alocação**: Pause o coletor (`collectgarbage("stop")`) e compare `collectgarbage("count")` antes e depois de um único frame. Tabelas reutilizadas devem registrar `0 KB` de delta.
+2. **Profiling de Traces e Frames**: No LuaJIT, use `jit.v` / `luajit -jv` para checar se alocações foram eliminadas, ou capture picos de frame com Tracy para confirmar que as pausas do GC sumiram.
 
 ---
 
