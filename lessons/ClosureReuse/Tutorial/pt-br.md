@@ -32,27 +32,32 @@ Esta lição compara a criação de closures por evento com uma única `local fu
 
 ## O Que Realmente Acontece por Baixo dos Panos?
 
-Em Lua, a definição de uma função é uma instrução executável (opcode `CLOSURE` em Lua 5.4; `FNEW` em LuaJIT). Quando uma função literal captura variáveis locais (`entity`, `multiplier`, `bonus`), essas variáveis viram **upvalues**.
+Em Lua, avaliar uma expressão `function(...) ... end` é uma instrução executável em tempo de execução (opcode `CLOSURE` em Lua 5.4; `FNEW` em LuaJIT), e não uma constante gratuita. Quando uma função inline lê variáveis locais do loop externo (`entity`, `multiplier`, `bonus`), a VM transforma essas variáveis em **upvalues** — células auxiliares no heap (`UpVal`) que mantêm as variáveis capturadas vivas mesmo depois que a iteração termina.
 
 ```mermaid
 flowchart LR
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
     subgraph Naive["Ingênuo: Closure por Evento (300.000 alocações no heap)"]
-        N1["Iteração i do loop"] --> N2["Opcode CLOSURE"]
-        N2 --> N3["Heap: cabeçalho LClosure"]
-        N3 --> N4["Heap: células UpVal (entity, mult, bonus)"]
-        N4 --> N5["Pressão de coleta no GC"]
+        N1["Iteração i do loop"]:::vm --> N2["Executa instrução CLOSURE<br/>(instancia novo objeto função)"]:::warn
+        N2 --> N3["Heap: cabeçalho LClosure<br/>(32+ bytes por evento)"]:::slow
+        N3 --> N4["Heap: células UpVal<br/>(entity, mult, bonus capturados)"]:::slow
+        N4 --> N5["Pressão de coleta no GC<br/>(51.8 MB alocados)"]:::slow
     end
 
     subgraph Optimized["Otimizado: Callback Sem Estado (0 alocações por frame)"]
-        O1["Carga do módulo: 1 protótipo"] --> O2["Arrays paralelos pré-alocados"]
-        O2 --> O3["Loop: callbacks[i](receivers[i], dt, mult[i], bonus[i])"]
-        O3 --> O4["Passagem direta em registradores (0 B no heap)"]
+        O1["Carga do módulo: 1 protótipo<br/>(criado uma única vez)"]:::fast --> O2["Arrays paralelos pré-alocados<br/>(receivers, mult, bonus)"]:::vm
+        O2 --> O3["Loop: callbacks[i](receivers[i], dt, mult[i], bonus[i])"]:::vm
+        O3 --> O4["Passagem direta em registradores<br/>(0 B por frame, 3.40x mais rápido)"]:::fast
     end
 ```
 
 Dois custos principais surgem na versão ingênua:
 
-1. **Alocação no Heap de `LClosure`:** Cada avaliação aloca um objeto `LClosure` no GC (`32+` bytes) além de células `UpVal` (`~32` bytes por variável capturada) quando o escopo escapa da pilha.
+1. **Alocação no Heap de `LClosure` e `UpVal`:** Um `LClosure` é o objeto no heap que une o bytecode compilado da função às suas variáveis capturadas. Cada iteração aloca um `LClosure` (`32+` bytes) além de células `UpVal` (`~32` bytes por variável capturada) quando o escopo escapa da pilha.
 2. **Abortos de Trace no LuaJIT:** Em LuaJIT, `FNEW` com upvalues que escapam frequentemente aborta a compilação JIT ou força alocações no heap.
 
 Quando movemos o callback para uma `local function apply_impulse(entity, step_dt, multiplier, bonus)` no topo do módulo sem capturar variáveis mutáveis, Lua cria o objeto da função **apenas uma vez** ao carregar o módulo.

@@ -32,27 +32,32 @@ This lesson compares per-event closure creation against a single module-level st
 
 ## What Actually Happens Under the Hood?
 
-In Lua, a function definition is an executable statement (`CLOSURE` bytecode instruction in Lua 5.4; `FNEW` in LuaJIT). When a `function` literal captures local variables (`entity`, `multiplier`, `bonus`), those variables become **upvalues**.
+In Lua, evaluating a `function(...) ... end` expression is an executable instruction (`CLOSURE` bytecode in Lua 5.4; `FNEW` in LuaJIT), not a free compile-time constant. When an inline function reads local variables from its enclosing loop (`entity`, `multiplier`, `bonus`), the VM turns those variables into **upvalues**—heap-backed wrapper cells (`UpVal`) that keep the captured variables alive even after the loop iteration finishes.
 
 ```mermaid
 flowchart LR
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
     subgraph Naive["Naive: Per-Event Closure (300,000 heap allocs)"]
-        N1["Loop iteration i"] --> N2["CLOSURE opcode"]
-        N2 --> N3["Heap: LClosure header"]
-        N3 --> N4["Heap: UpVal cells (entity, mult, bonus)"]
-        N4 --> N5["GC Sweep Churn"]
+        N1["Loop iteration i"]:::vm --> N2["Run CLOSURE instruction<br/>(instantiate new function object)"]:::warn
+        N2 --> N3["Heap: LClosure header<br/>(32+ bytes per event)"]:::slow
+        N3 --> N4["Heap: UpVal wrapper cells<br/>(entity, mult, bonus captured)"]:::slow
+        N4 --> N5["GC Sweep Churn<br/>(51.8 MB allocated)"]:::slow
     end
 
     subgraph Optimized["Optimized: Stateless Callback (0 per-frame allocs)"]
-        O1["Module load: 1 function prototype"] --> O2["Pre-allocated parallel arrays"]
-        O2 --> O3["Loop: callbacks[i](receivers[i], dt, mult[i], bonus[i])"]
-        O3 --> O4["Direct VM register pass (0 B heap alloc)"]
+        O1["Module load: 1 function prototype<br/>(created once at startup)"]:::fast --> O2["Pre-allocated parallel arrays<br/>(receivers, mult, bonus)"]:::vm
+        O2 --> O3["Loop: callbacks[i](receivers[i], dt, mult[i], bonus[i])"]:::vm
+        O3 --> O4["Direct VM register pass<br/>(0 B per-frame alloc, 3.40x faster)"]:::fast
     end
 ```
 
 Two important costs happen in the naive version:
 
-1. **Heap Allocation of `LClosure`:** Each evaluation allocates a new `LClosure` GC object (`32+` bytes) plus `UpVal` wrappers (`~32` bytes per captured local) when variables escape the stack frame.
+1. **Heap Allocation of `LClosure` & `UpVal`:** An `LClosure` is the heap object that pairs a function's compiled bytecode with its captured variables. Each loop iteration allocates a new `LClosure` (`32+` bytes) plus `UpVal` cells (`~32` bytes per captured local) when variables escape the stack frame.
 2. **LuaJIT Trace Aborts:** In LuaJIT, `FNEW` with escaping upvalues frequently aborts JIT compilation or forces allocations onto the GC heap, preventing register-only execution.
 
 When we hoist the callback to a module-level `local function apply_impulse(entity, step_dt, multiplier, bonus)` that captures **zero** mutable locals, Lua creates that function object **once** at module load time.

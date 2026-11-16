@@ -24,7 +24,7 @@ Em Lua, concatenar strings dentro de um loop com `..` funciona exatamente como r
 
 ## Por que Strings em Lua São Imutáveis e Internadas
 
-Em Lua 5.4 e LuaJIT, strings são sequências de bytes **imutáveis**: após criadas, nunca podem ser alteradas no local. Strings curtas (até 40 bytes no Lua 5.4) também são **internadas** em uma tabela hash global para que comparações (`a == b`) ocorram em $O(1)$ por ponteiro.
+Em Lua 5.4 e LuaJIT, strings são sequências de bytes **imutáveis**: após criadas, nunca podem ser alteradas no local. Strings curtas (até 40 bytes no Lua 5.4) também são **internadas** — deduplicadas em uma tabela hash global para que strings idênticas compartilhem um único endereço e comparações (`a == b`) ocorram em $O(1)$ por ponteiro.
 
 Como strings não crescem no local, cada `out = out .. entry` dentro de um loop precisa:
 
@@ -47,20 +47,25 @@ iter n: [1][2]...[n] (~341 MB!)    concat(buf, "", 1, n) -> 1 alocação!
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Ingênua: Concatenação O(n^2) em Loop"]
-        N1["Iteração i"] --> N2["Alocar len(out) + len(entry)"]
-        N2 --> N3["Copiar Todos os Bytes Anteriores"]
-        N3 --> N4["Descartar String Antiga no GC (~341 MB)"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Ingênua: Concatenação O(n^2) em Loop (~341 MB)"]
+        N1["Iteração i"]:::vm --> N2["Alocar len(out) + len(entry)<br/>(strings não crescem no local)"]:::warn
+        N2 --> N3["Copiar TODOS os bytes anteriores<br/>(1 + 2 + ... + n cópias)"]:::slow
+        N3 --> N4["Descartar string antiga no GC<br/>(342x mais lento)"]:::slow
     end
 
-    subgraph Optimized["Otimizada: table.concat em O(n)"]
-        O1["Iteração i"] --> O2["Guardar Fragmento em buf[i]"]
-        O2 --> O3["Fim do Loop"]
-        O3 --> O4["table.concat Soma Tamanhos + Copia 1x"]
+    subgraph Optimized["Otimizada: table.concat em O(n) (281 KB)"]
+        O1["Iteração i"]:::vm --> O2["Guardar fragmento em buf[i]<br/>(slot de array, sem cópia)"]:::vm
+        O2 --> O3["Fim do loop"]:::vm
+        O3 --> O4["table.concat soma tamanhos 1x<br/>+ copia cada fragmento 1x"]:::fast
     end
 ```
 
-`table.concat(buf, "", 1, count)` percorre `buf[1..count]` uma vez para somar o tamanho total em bytes, aloca um único `luaL_Buffer` do tamanho exato e copia cada fragmento uma única vez em tempo $O(n)$.
+`table.concat(buf, "", 1, count)` percorre `buf[1..count]` uma vez para somar o tamanho total em bytes, aloca um único buffer de saída em C (`luaL_Buffer`) do tamanho exato e copia cada fragmento uma única vez em tempo $O(n)$.
 
 ---
 

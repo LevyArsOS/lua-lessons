@@ -27,8 +27,8 @@ Lua tables look identical on the surface, yet their internal memory layout chang
 
 Every Lua `Table` C struct contains two separate storage regions:
 
-1. **Array Part (`TValue *array`)**: A contiguous C array for dense integer keys `1..n`. Indexing `t[i]` is a single bounds check plus pointer arithmetic (`array[i - 1]`).
-2. **Hash Part (`Node *node`)**: A chained scatter table for string keys, floats, booleans, or sparse integers. Iterating with `pairs(t)` calls Lua's `next()` function on every step to probe hash buckets and follow collision chains.
+1. **Array Part (`TValue *array`)**: A contiguous C array of value slots for dense integer keys `1..n`. Indexing `t[i]` is a single bounds check plus direct pointer arithmetic (`array[i - 1]`)—no hashing needed.
+2. **Hash Part (`Node *node`)**: A chained scatter table (hash buckets linked together on collisions) for string keys, floats, booleans, or sparse integers. Iterating with `pairs(t)` calls Lua's internal `next()` cursor function on every step to probe hash buckets and follow collision chains in arbitrary order.
 
 ```text
 Hash Table ("e1", "e2")        Contiguous Array (AoS)       Parallel Arrays (SoA)
@@ -41,16 +41,21 @@ Hash Table ("e1", "e2")        Contiguous Array (AoS)       Parallel Arrays (SoA
 
 ```mermaid
 flowchart TD
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
     subgraph Hash["Naive: String Keys + pairs()"]
-        H1["for _, e in pairs(entities)"] --> H2["Invoke next() Iterator"]
-        H2 --> H3["Probe Hash Buckets + Follow Links"]
-        H3 --> H4["Hash Lookup e.x, e.vx"]
+        H1["for _, e in pairs(entities)"]:::slow --> H2["Call next() cursor each step<br/>(scans scattered hash buckets)"]:::warn
+        H2 --> H3["Pointer hop to entity subtable<br/>(random RAM address)"]:::slow
+        H3 --> H4["Hash lookup for e.x, e.vx<br/>(cache miss on every entity)"]:::slow
     end
 
     subgraph SoA["Optimized: Parallel 1..n Arrays (SoA)"]
-        S1["for i = 1, n do"] --> S2["Direct C Array Index xs[i], vxs[i]"]
-        S2 --> S3["Sequential Cache-Line Prefetch"]
-        S3 --> S4["Zero Subtable Dereferences"]
+        S1["for i = 1, n do"]:::vm --> S2["Direct slot offset xs[i], vxs[i]<br/>(array[i - 1] with 0 hashing)"]:::vm
+        S2 --> S3["Sequential 64-byte cache-line prefetch<br/>(CPU streams adjacent floats)"]:::fast
+        S3 --> S4["Zero subtable dereferences<br/>(0.00 KB GC delta, 7.25x faster)"]:::fast
     end
 ```
 

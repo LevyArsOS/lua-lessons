@@ -27,8 +27,8 @@ Tabelas em Lua parecem idênticas na sintaxe, mas seu layout interno de memória
 
 Toda `Table` em Lua possui duas áreas de armazenamento separadas em C:
 
-1. **Parte de Array (`TValue *array`)**: Um array C contíguo para chaves inteiras densas `1..n`. Indexar `t[i]` faz apenas uma checagem de limite e aritmética de ponteiro (`array[i - 1]`).
-2. **Parte Hash (`Node *node`)**: Uma tabela de espalhamento encadeada para strings, floats, booleanos ou inteiros esparsos. Iterar com `pairs(t)` chama `next()` a cada passo para sondar buckets e seguir cadeias de colisão.
+1. **Parte de Array (`TValue *array`)**: Um array C contíguo de slots de valores para chaves inteiras densas `1..n`. Indexar `t[i]` faz apenas uma checagem de limite e aritmética direta de ponteiro (`array[i - 1]`) — sem calcular hash.
+2. **Parte Hash (`Node *node`)**: Uma tabela de espalhamento encadeada (buckets de hash ligados em caso de colisão) para strings, floats, booleanos ou inteiros esparsos. Iterar com `pairs(t)` chama a função interna de cursor `next()` a cada passo para sondar buckets e seguir cadeias de colisão em ordem arbitrária.
 
 ```text
 Tabela Hash ("e1", "e2")       Array Contíguo (AoS)           Arrays Paralelos (SoA)
@@ -41,16 +41,21 @@ Tabela Hash ("e1", "e2")       Array Contíguo (AoS)           Arrays Paralelos 
 
 ```mermaid
 flowchart TD
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
     subgraph Hash["Ingênua: Chaves String + pairs()"]
-        H1["for _, e in pairs(entities)"] --> H2["Chamar Iterador next()"]
-        H2 --> H3["Sondar Buckets Hash + Seguir Links"]
-        H3 --> H4["Buscar Campos e.x, e.vx"]
+        H1["for _, e in pairs(entities)"]:::slow --> H2["Chamar cursor next() a cada passo<br/>(sonda buckets espalhados)"]:::warn
+        H2 --> H3["Salto de ponteiro para subtabela<br/>(endereço aleatório na RAM)"]:::slow
+        H3 --> H4["Busca hash para e.x, e.vx<br/>(cache miss em cada entidade)"]:::slow
     end
 
     subgraph SoA["Otimizada: Arrays Paralelos 1..n (SoA)"]
-        S1["for i = 1, n do"] --> S2["Índice Direto no Array C xs[i], vxs[i]"]
-        S2 --> S3["Prefetch Sequencial em Linha de Cache"]
-        S3 --> S4["Zero Indireções de Subtabela"]
+        S1["for i = 1, n do"]:::vm --> S2["Offset direto xs[i], vxs[i]<br/>(array[i - 1] sem hash)"]:::vm
+        S2 --> S3["Prefetch sequencial em cache de 64 B<br/>(CPU lê floats adjacentes)"]:::fast
+        S3 --> S4["Zero indireções de subtabela<br/>(0.00 KB no GC, 7.25x mais rápido)"]:::fast
     end
 ```
 

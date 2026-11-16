@@ -26,9 +26,9 @@ In Lua game loops, short-lived entities like bullets, particles, damage popups, 
 
 In Lua 5.4 and LuaJIT, every `{ ... }` constructor allocates a `Table` C struct on the heap. For a projectile with 6 named fields (`x`, `y`, `vx`, `vy`, `ttl`, `active`), the runtime allocates:
 
-1. **Table Header**: ~40–56 bytes for GC metadata, array pointer, hash pointer, and metatable reference.
-2. **Hash Node Array**: Space for 8 hash `Node` slots (next power of two above 6 keys), totaling ~248 bytes per projectile in our benchmark.
-3. **GC Write Barriers and Sweeps**: Every new table enters the incremental mark-and-sweep collector's object list.
+1. **Table Header**: ~40–56 bytes for garbage collector (GC) metadata, array pointer, hash pointer, and metatable reference.
+2. **Hash Node Array**: Space for 8 hash `Node` buckets (next power of two above 6 keys), totaling ~248 bytes per projectile in our benchmark.
+3. **GC Write Barriers and Sweeps**: Every new table is registered with Lua's incremental mark-and-sweep collector—which periodically traces live objects and sweeps dead ones, causing frame-time stutters when thousands of short-lived tables pile up.
 
 ```text
 Heap (Naive: 10,000 spawns)          Heap (Pooled: 200 capacity)
@@ -43,19 +43,24 @@ Heap (Naive: 10,000 spawns)          Heap (Pooled: 200 capacity)
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Naive: Per-Spawn Allocation"]
-        S1["Spawn Projectile"] --> A1["Allocate Table + 8 Hash Nodes"]
-        A1 --> U1["Update for N Frames"]
-        U1 --> D1["Drop Reference"]
-        D1 --> GC1["GC Marks & Sweeps (~2.43 MB)"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Naive: Per-Spawn Allocation (2.43 MB churn)"]
+        S1["Spawn Projectile"]:::vm --> A1["Allocate Table + 8 Hash Nodes<br/>(~248 bytes per spawn)"]:::slow
+        A1 --> U1["Update for N Frames"]:::vm
+        U1 --> D1["Drop Reference on Expiry"]:::warn
+        D1 --> GC1["GC Marks & Sweeps<br/>(frame-time stutters)"]:::slow
     end
 
-    subgraph Pooled["Optimized: Object Pool"]
-        Init["Scene Load: Pool.new_pool(200)"] --> Stack["_free[1..200] Stack"]
-        S2["Spawn: pool:get()"] --> Pop["Pop _free[_top], _top - 1"]
-        Pop --> U2["activate_projectile() + Update"]
-        U2 --> Rel["Expire: pool:release(p)"]
-        Rel --> Reset["reset_projectile(p) + Push _free"]
+    subgraph Pooled["Optimized: Free-List Object Pool (~0 KB delta)"]
+        Init["Scene Load: Pool.new_pool(200)<br/>(pre-warm 200 tables once)"]:::fast --> Stack["_free[1..200] Array Stack"]:::vm
+        S2["Spawn: pool:get()"]:::vm --> Pop["Pop _free[_top], _top - 1<br/>(O(1), 0 allocations)"]:::fast
+        Pop --> U2["activate_projectile() + Update"]:::vm
+        U2 --> Rel["Expire: pool:release(p)"]:::vm
+        Rel --> Reset["reset_projectile(p) + Push _free<br/>(ready for next spawn)"]:::fast
     end
 ```
 

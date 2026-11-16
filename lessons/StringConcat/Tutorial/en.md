@@ -24,7 +24,7 @@ In Lua, concatenating strings inside a loop with `..` behaves exactly like recop
 
 ## Why Lua Strings Are Immutable and Interned
 
-In Lua 5.4 and LuaJIT, strings are **immutable** byte sequences: once created, a string's contents can never be modified in place. Short strings (up to 40 bytes in Lua 5.4) are also **interned** in a global string hash table so string equality (`a == b`) is an $O(1)$ pointer comparison.
+In Lua 5.4 and LuaJIT, strings are **immutable** byte sequences: once created, a string's contents can never be modified in place. Short strings (up to 40 bytes in Lua 5.4) are also **interned**—deduplicated inside a global string hash table so identical strings share one memory address and equality (`a == b`) is an $O(1)$ pointer comparison.
 
 Because strings cannot grow in place, every `out = out .. entry` inside a loop must:
 
@@ -47,20 +47,25 @@ iter n: [1][2]...[n] (~341 MB!)    concat(buf, "", 1, n) -> 1 allocation!
 
 ```mermaid
 flowchart TD
-    subgraph Naive["Naive: O(n^2) Loop Concatenation"]
-        N1["Iteration i"] --> N2["Allocate len(out) + len(entry)"]
-        N2 --> N3["Copy All Prior Bytes"]
-        N3 --> N4["Discard Old String to GC (~341 MB)"]
+    classDef slow fill:#fee2e2,stroke:#dc2626,color:#111827
+    classDef fast fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef vm fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef warn fill:#fef3c7,stroke:#d97706,color:#111827
+
+    subgraph Naive["Naive: O(n^2) Loop Concatenation (~341 MB)"]
+        N1["Iteration i"]:::vm --> N2["Allocate len(out) + len(entry)<br/>(strings cannot grow in place)"]:::warn
+        N2 --> N3["Copy ALL prior bytes + entry<br/>(1 + 2 + ... + n copies)"]:::slow
+        N3 --> N4["Discard old string to GC<br/>(342x slower)"]:::slow
     end
 
-    subgraph Optimized["Optimized: O(n) table.concat"]
-        O1["Iteration i"] --> O2["Store Fragment in buf[i]"]
-        O2 --> O3["Loop Ends"]
-        O3 --> O4["table.concat Sums Lengths + Copies Once"]
+    subgraph Optimized["Optimized: O(n) table.concat (281 KB)"]
+        O1["Iteration i"]:::vm --> O2["Store fragment in buf[i]<br/>(array slot, no copying)"]:::vm
+        O2 --> O3["Loop ends"]:::vm
+        O3 --> O4["table.concat sums lengths once<br/>+ copies each fragment 1x"]:::fast
     end
 ```
 
-`table.concat(buf, "", 1, count)` walks `buf[1..count]` once to sum the total byte length, allocates a single `luaL_Buffer` of the exact final size, and copies each fragment once in $O(n)$ time.
+`table.concat(buf, "", 1, count)` walks `buf[1..count]` once to sum the total byte length, allocates a single C-side output buffer (`luaL_Buffer`) of the exact final size, and copies each fragment once in $O(n)$ time.
 
 ---
 
