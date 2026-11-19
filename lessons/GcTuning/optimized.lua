@@ -21,11 +21,14 @@ function M.simulate(frames, events_per_frame, opts)
     end
 
     collectgarbage("collect")
-    local use_generational = (mode == "generational") and supports_generational()
+    local has_generational = supports_generational()
+    local use_generational = (mode == "generational") and has_generational
     if use_generational then
         collectgarbage("generational", 20, 100)
     else
-        collectgarbage("incremental")
+        if has_generational then
+            collectgarbage("incremental")
+        end
         if mode == "incremental_step" then
             collectgarbage("stop")
         end
@@ -65,7 +68,9 @@ function M.simulate(frames, events_per_frame, opts)
         end
     end
 
-    collectgarbage("incremental")
+    if has_generational then
+        collectgarbage("incremental")
+    end
     collectgarbage("restart")
     return {
         checksum = checksum,
