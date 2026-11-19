@@ -21,4 +21,5 @@ exactly; a concept that needs a sentence to explain gets an entry here instead.
 | Hash part | Chained scatter-table region (`Node`) of a Lua table for string or sparse keys | The contiguous array part (`1..n`) |
 | VM register | Fixed stack slot (`0..249`) holding a `local` variable in a Lua function frame | Environment lookup in `_ENV` |
 | Closure allocation (`CLOSURE`) | Heap-allocating a new `LClosure` header and `UpVal` cells each time `function(...) ... end` executes | Calling a pre-allocated stateless `local function` with explicit context arguments |
+| Incremental GC step | Running a bounded slice of Lua's tri-color mark-and-sweep collector (`collectgarbage("step", step_kb)`) at frame boundaries instead of letting the collector spike mid-frame | Full stop-the-world `collectgarbage("collect")` |
 

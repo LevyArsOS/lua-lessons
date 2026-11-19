@@ -38,6 +38,7 @@ Start with **Memory & Garbage Collection** to eliminate frame-time allocations, 
 | Object Pooling | [English](lessons/ObjectPooling/Tutorial/en.md) · [Português](lessons/ObjectPooling/Tutorial/pt-br.md) | [Results](lessons/ObjectPooling/Benchmark.md) |
 | String Concatenation | [English](lessons/StringConcat/Tutorial/en.md) · [Português](lessons/StringConcat/Tutorial/pt-br.md) | [Results](lessons/StringConcat/Benchmark.md) |
 | Closure Reuse | [English](lessons/ClosureReuse/Tutorial/en.md) · [Português](lessons/ClosureReuse/Tutorial/pt-br.md) | [Results](lessons/ClosureReuse/Benchmark.md) |
+| GC Tuning | [English](lessons/GcTuning/Tutorial/en.md) · [Português](lessons/GcTuning/Tutorial/pt-br.md) | [Results](lessons/GcTuning/Benchmark.md) |
 
 ### Data Layout & Cache Locality
 
